@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import axios from 'axios';
+import { AuthContext } from '../context/AuthContext';
 
 const OrderForm = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ const OrderForm = () => {
   });
 
   const [message, setMessage] = useState({ type: '', text: '' });
+  const { token } = useContext(AuthContext);
 
   const handleChange = (e) => {
     setFormData({
@@ -22,7 +24,11 @@ const OrderForm = () => {
     e.preventDefault();
     
     try {
-      const response = await axios.post('http://localhost:5000/api/orders', formData);
+      const response = await axios.post('http://localhost:5000/api/orders', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       if (response.data.success) {
         setMessage({ type: 'success', text: 'Order placed successfully!' });

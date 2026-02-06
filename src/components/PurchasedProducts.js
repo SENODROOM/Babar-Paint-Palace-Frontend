@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { AuthContext } from '../context/AuthContext';
 
 const PurchasedProducts = () => {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const { token } = useContext(AuthContext);
 
   useEffect(() => {
     fetchOrders();
@@ -28,7 +30,11 @@ const PurchasedProducts = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/orders');
+      const response = await axios.get('http://localhost:5000/api/orders', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       if (response.data.success) {
         setOrders(response.data.data);
         setFilteredOrders(response.data.data);
@@ -43,7 +49,11 @@ const PurchasedProducts = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/orders/${id}`);
+        await axios.delete(`http://localhost:5000/api/orders/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
         fetchOrders();
       } catch (error) {
         console.error('Error deleting order:', error);
