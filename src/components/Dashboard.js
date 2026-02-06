@@ -15,6 +15,35 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const { token } = useContext(AuthContext);
 
+    // Load settings from localStorage
+    const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('dashboardSettings');
+        return saved ? JSON.parse(saved) : {
+            theme: 'light',
+            dashboardView: 'cards',
+            dateFormat: 'MM/DD/YYYY',
+            currency: 'PKR',
+            itemsPerPage: 10,
+            showActivityGraph: true,
+            showTodayOrders: true,
+            showRevenue: true,
+            defaultView: 'dashboard'
+        };
+    });
+
+    // Listen for settings changes
+    useEffect(() => {
+        const handleSettingsChange = () => {
+            const saved = localStorage.getItem('dashboardSettings');
+            if (saved) {
+                setSettings(JSON.parse(saved));
+            }
+        };
+
+        window.addEventListener('settingsChanged', handleSettingsChange);
+        return () => window.removeEventListener('settingsChanged', handleSettingsChange);
+    }, []);
+
     useEffect(() => {
         const fetchDashboardData = async () => {
             if (!token) return;
@@ -112,11 +141,29 @@ const Dashboard = () => {
     };
 
     const formatDate = (date) => {
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
+        // Format date based on user settings
+        const options = { month: 'short', day: 'numeric', year: 'numeric' };
+
+        switch (settings.dateFormat) {
+            case 'DD/MM/YYYY':
+                return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+            case 'YYYY-MM-DD':
+                return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+            case 'MM/DD/YYYY':
+            default:
+                return date.toLocaleDateString('en-US', options);
+        }
+    };
+
+    const formatCurrency = (amount) => {
+        const symbols = {
+            'PKR': 'PKR',
+            'USD': '$',
+            'EUR': 'â‚¬',
+            'GBP': 'Â£'
+        };
+        const symbol = symbols[settings.currency] || settings.currency;
+        return `${symbol} ${amount.toLocaleString()}`;
     };
 
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -126,6 +173,112 @@ const Dashboard = () => {
         return <div className="loading">Loading dashboard...</div>;
     }
 
+    // Render stats based on dashboard view setting
+    const renderStats = () => {
+        const statsArray = [
+            {
+                icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                ),
+                iconClass: 'customers-icon',
+                value: stats.totalCustomers,
+                label: 'Total Customers'
+            },
+            {
+                icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                ),
+                iconClass: 'orders-icon',
+                value: stats.totalOrders,
+                label: 'Total Orders'
+            },
+            {
+                icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                ),
+                iconClass: 'revenue-icon',
+                value: formatCurrency(stats.totalRevenue),
+                label: 'Total Revenue',
+                show: settings.showRevenue
+            },
+            {
+                icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                ),
+                iconClass: 'today-icon',
+                value: stats.todayOrders,
+                label: "Today's Orders",
+                show: settings.showTodayOrders
+            }
+        ];
+
+        // Filter out stats based on settings
+        const visibleStats = statsArray.filter(stat => stat.show !== false);
+
+        if (settings.dashboardView === 'list') {
+            return (
+                <div className="stats-list">
+                    {visibleStats.map((stat, index) => (
+                        <div key={index} className="stat-list-item">
+                            <div className={`stat-icon ${stat.iconClass}`}>
+                                {stat.icon}
+                            </div>
+                            <div className="stat-list-content">
+                                <p className="stat-label">{stat.label}</p>
+                                <h3 className="stat-value">{stat.value}</h3>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        } else if (settings.dashboardView === 'compact') {
+            return (
+                <div className="stats-compact">
+                    {visibleStats.map((stat, index) => (
+                        <div key={index} className="stat-compact-item">
+                            <span className="stat-compact-label">{stat.label}:</span>
+                            <span className="stat-compact-value">{stat.value}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        } else {
+            // Default cards view
+            return (
+                <div className="stats-grid">
+                    {visibleStats.map((stat, index) => (
+                        <div key={index} className="stat-card">
+                            <div className={`stat-icon ${stat.iconClass}`}>
+                                {stat.icon}
+                            </div>
+                            <div className="stat-content">
+                                <h3 className="stat-value">{stat.value}</h3>
+                                <p className="stat-label">{stat.label}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+    };
+
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
@@ -133,123 +286,68 @@ const Dashboard = () => {
                 <p className="dashboard-subtitle">Overview of your store's performance</p>
             </div>
 
-            {/* Stats Cards */}
-            <div className="stats-grid">
-                <div className="stat-card">
-                    <div className="stat-icon customers-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                    </div>
-                    <div className="stat-content">
-                        <h3 className="stat-value">{stats.totalCustomers}</h3>
-                        <p className="stat-label">Total Customers</p>
-                    </div>
-                </div>
+            {/* Stats Section */}
+            {renderStats()}
 
-                <div className="stat-card">
-                    <div className="stat-icon orders-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                            <line x1="3" y1="6" x2="21" y2="6"></line>
-                            <path d="M16 10a4 4 0 0 1-8 0"></path>
-                        </svg>
-                    </div>
-                    <div className="stat-content">
-                        <h3 className="stat-value">{stats.totalOrders}</h3>
-                        <p className="stat-label">Total Orders</p>
-                    </div>
-                </div>
-
-                <div className="stat-card">
-                    <div className="stat-icon revenue-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                    </div>
-                    <div className="stat-content">
-                        <h3 className="stat-value">PKR {stats.totalRevenue.toLocaleString()}</h3>
-                        <p className="stat-label">Total Revenue</p>
-                    </div>
-                </div>
-
-                <div className="stat-card">
-                    <div className="stat-icon today-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </div>
-                    <div className="stat-content">
-                        <h3 className="stat-value">{stats.todayOrders}</h3>
-                        <p className="stat-label">Today's Orders</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Activity Graph */}
-            <div className="activity-section">
-                <div className="activity-header">
-                    <h2>Order Activity</h2>
-                    <div className="activity-legend">
-                        <span>Less</span>
-                        <div className="legend-squares">
-                            <div className="activity-square level-0" title="No orders"></div>
-                            <div className="activity-square level-1" title="1-2 orders"></div>
-                            <div className="activity-square level-2" title="3-4 orders"></div>
-                            <div className="activity-square level-3" title="5-6 orders"></div>
-                            <div className="activity-square level-4" title="7+ orders"></div>
+            {/* Activity Graph - Only show if enabled in settings */}
+            {settings.showActivityGraph && (
+                <div className="activity-section">
+                    <div className="activity-header">
+                        <h2>Order Activity</h2>
+                        <div className="activity-legend">
+                            <span>Less</span>
+                            <div className="legend-squares">
+                                <div className="activity-square level-0" title="No orders"></div>
+                                <div className="activity-square level-1" title="1-2 orders"></div>
+                                <div className="activity-square level-2" title="3-4 orders"></div>
+                                <div className="activity-square level-3" title="5-6 orders"></div>
+                                <div className="activity-square level-4" title="7+ orders"></div>
+                            </div>
+                            <span>More</span>
                         </div>
-                        <span>More</span>
-                    </div>
-                </div>
-
-                <div className="activity-graph">
-                    <div className="day-labels">
-                        {dayLabels.map((day, idx) => (
-                            idx % 2 === 1 && <div key={idx} className="day-label">{day}</div>
-                        ))}
                     </div>
 
-                    <div className="activity-grid-wrapper">
-                        <div className="activity-grid">
-                            {activityData.map((week, weekIdx) => (
-                                <div key={weekIdx} className="activity-week">
-                                    {week.map((day, dayIdx) => (
-                                        <div
-                                            key={dayIdx}
-                                            className={`activity-square ${getActivityLevel(day.count)}`}
-                                            title={`${formatDate(day.date)}: ${day.count} order${day.count !== 1 ? 's' : ''}`}
-                                            data-count={day.count}
-                                            data-date={formatDate(day.date)}
-                                        ></div>
-                                    ))}
-                                </div>
+                    <div className="activity-graph">
+                        <div className="day-labels">
+                            {dayLabels.map((day, idx) => (
+                                idx % 2 === 1 && <div key={idx} className="day-label">{day}</div>
                             ))}
                         </div>
 
-                        <div className="month-labels">
-                            {activityData.map((week, weekIdx) => {
-                                const firstDay = week[0].date;
-                                const month = firstDay.getMonth();
-                                const isFirstWeekOfMonth = firstDay.getDate() <= 7;
-
-                                return isFirstWeekOfMonth ? (
-                                    <div key={weekIdx} className="month-label" style={{ left: `${weekIdx * 15}px` }}>
-                                        {monthLabels[month]}
+                        <div className="activity-grid-wrapper">
+                            <div className="activity-grid">
+                                {activityData.map((week, weekIdx) => (
+                                    <div key={weekIdx} className="activity-week">
+                                        {week.map((day, dayIdx) => (
+                                            <div
+                                                key={dayIdx}
+                                                className={`activity-square ${getActivityLevel(day.count)}`}
+                                                title={`${formatDate(day.date)}: ${day.count} order${day.count !== 1 ? 's' : ''}`}
+                                                data-count={day.count}
+                                                data-date={formatDate(day.date)}
+                                            ></div>
+                                        ))}
                                     </div>
-                                ) : null;
-                            })}
+                                ))}
+                            </div>
+
+                            <div className="month-labels">
+                                {activityData.map((week, weekIdx) => {
+                                    const firstDay = week[0].date;
+                                    const month = firstDay.getMonth();
+                                    const isFirstWeekOfMonth = firstDay.getDate() <= 7;
+
+                                    return isFirstWeekOfMonth ? (
+                                        <div key={weekIdx} className="month-label" style={{ left: `${weekIdx * 15}px` }}>
+                                            {monthLabels[month]}
+                                        </div>
+                                    ) : null;
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

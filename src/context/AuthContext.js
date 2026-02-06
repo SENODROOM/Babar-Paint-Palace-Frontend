@@ -149,8 +149,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Function to update user data in context after profile update
+  const updateUser = (updatedUserData) => {
+    setUser(updatedUserData);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
