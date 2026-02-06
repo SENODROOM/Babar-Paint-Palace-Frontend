@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext, useCallback } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
+const API_BASE_URL = 'https://store-flow-api.vercel.app';
+
 const PurchasedProducts = () => {
   const [orders, setOrders] = useState([]);
   const [groupedOrders, setGroupedOrders] = useState({});
@@ -20,24 +22,28 @@ const PurchasedProducts = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/orders', {
+      const response = await axios.get(`${API_BASE_URL}/api/orders`, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       if (response.data.success) {
         setOrders(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error fetching orders:', error.response?.data || error.message);
+      alert('Error loading orders. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (token) {
+      fetchOrders();
+    }
+  }, [fetchOrders, token]);
 
   useEffect(() => {
     // Group orders by customer name
@@ -86,14 +92,15 @@ const PurchasedProducts = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/orders/${id}`, {
+        await axios.delete(`${API_BASE_URL}/api/orders/${id}`, {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         fetchOrders();
       } catch (error) {
-        console.error('Error deleting order:', error);
+        console.error('Error deleting order:', error.response?.data || error.message);
         alert('Error deleting order. Please try again.');
       }
     }
@@ -120,16 +127,17 @@ const PurchasedProducts = () => {
   const handleUpdateOrder = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:5000/api/orders/${editingOrder._id}`, editFormData, {
+      await axios.put(`${API_BASE_URL}/api/orders/${editingOrder._id}`, editFormData, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       setEditingOrder(null);
       fetchOrders();
       alert('Order updated successfully!');
     } catch (error) {
-      console.error('Error updating order:', error);
+      console.error('Error updating order:', error.response?.data || error.message);
       alert('Error updating order. Please try again.');
     }
   };
